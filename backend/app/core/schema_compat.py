@@ -53,13 +53,50 @@ def ensure_schema_compatibility(engine: Engine) -> None:
             )
             existing_tables.add("documents")
 
+        if "documents" in existing_tables:
+            doc_id_type = _column_type(conn, "documents", "id")
+            if doc_id_type in {"integer", "bigint", "smallint"}:
+                conn.execute(
+                    text(
+                        "ALTER TABLE documents ALTER COLUMN id TYPE VARCHAR(36) USING id::text"
+                    )
+                )
+
+            conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS filename VARCHAR(500)"))
+            conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS original_filename VARCHAR(500)"))
+            conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_path VARCHAR(1000)"))
+            conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_size INTEGER"))
+            conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_type VARCHAR(100)"))
+            conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS mime_type VARCHAR(200)"))
+            conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS uploaded_at TIMESTAMP"))
+            conn.execute(text("UPDATE documents SET filename = 'legacy-document' WHERE filename IS NULL"))
+            conn.execute(
+                text(
+                    "UPDATE documents SET original_filename = COALESCE(original_filename, filename, 'legacy-document') "
+                    "WHERE original_filename IS NULL"
+                )
+            )
+            conn.execute(text("UPDATE documents SET file_path = '' WHERE file_path IS NULL"))
+            conn.execute(text("UPDATE documents SET file_size = 0 WHERE file_size IS NULL"))
+            conn.execute(text("UPDATE documents SET file_type = '' WHERE file_type IS NULL"))
+            conn.execute(text("UPDATE documents SET uploaded_at = NOW() WHERE uploaded_at IS NULL"))
+            conn.execute(text("ALTER TABLE documents ALTER COLUMN uploaded_at SET DEFAULT NOW()"))
+
+        # Create dependent tables after documents.id type has been normalized.
+        doc_id_type = _column_type(conn, "documents", "id")
+        doc_fk_sql_type = "VARCHAR(36)"
+        if doc_id_type == "uuid":
+            doc_fk_sql_type = "UUID"
+        elif doc_id_type in {"integer", "bigint", "smallint"}:
+            doc_fk_sql_type = "INTEGER"
+
         if "processing_jobs" not in existing_tables:
             conn.execute(
                 text(
-                    """
+                    f"""
                     CREATE TABLE IF NOT EXISTS processing_jobs (
                         id VARCHAR(36) PRIMARY KEY,
-                        document_id VARCHAR(36) NOT NULL REFERENCES documents(id),
+                        document_id {doc_fk_sql_type} NOT NULL REFERENCES documents(id),
                         celery_task_id VARCHAR(200),
                         status VARCHAR(20) NOT NULL DEFAULT 'queued',
                         current_stage VARCHAR(100),
@@ -121,35 +158,6 @@ def ensure_schema_compatibility(engine: Engine) -> None:
                 )
             )
             existing_tables.add("job_events")
-
-        if "documents" in existing_tables:
-            doc_id_type = _column_type(conn, "documents", "id")
-            if doc_id_type in {"integer", "bigint", "smallint"}:
-                conn.execute(
-                    text(
-                        "ALTER TABLE documents ALTER COLUMN id TYPE VARCHAR(36) USING id::text"
-                    )
-                )
-
-            conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS filename VARCHAR(500)"))
-            conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS original_filename VARCHAR(500)"))
-            conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_path VARCHAR(1000)"))
-            conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_size INTEGER"))
-            conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_type VARCHAR(100)"))
-            conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS mime_type VARCHAR(200)"))
-            conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS uploaded_at TIMESTAMP"))
-            conn.execute(text("UPDATE documents SET filename = 'legacy-document' WHERE filename IS NULL"))
-            conn.execute(
-                text(
-                    "UPDATE documents SET original_filename = COALESCE(original_filename, filename, 'legacy-document') "
-                    "WHERE original_filename IS NULL"
-                )
-            )
-            conn.execute(text("UPDATE documents SET file_path = '' WHERE file_path IS NULL"))
-            conn.execute(text("UPDATE documents SET file_size = 0 WHERE file_size IS NULL"))
-            conn.execute(text("UPDATE documents SET file_type = '' WHERE file_type IS NULL"))
-            conn.execute(text("UPDATE documents SET uploaded_at = NOW() WHERE uploaded_at IS NULL"))
-            conn.execute(text("ALTER TABLE documents ALTER COLUMN uploaded_at SET DEFAULT NOW()"))
 
         if "processing_jobs" in existing_tables:
             jobs_id_type = _column_type(conn, "processing_jobs", "id")
