@@ -82,6 +82,37 @@ def ensure_schema_compatibility(engine: Engine) -> None:
             conn.execute(text("UPDATE documents SET uploaded_at = NOW() WHERE uploaded_at IS NULL"))
             conn.execute(text("ALTER TABLE documents ALTER COLUMN uploaded_at SET DEFAULT NOW()"))
 
+            # Legacy schemas may include extra NOT NULL columns (e.g., user_id)
+            # not present in the current app model. Relax them so inserts work.
+            required_columns = {
+                "id",
+                "filename",
+                "original_filename",
+                "file_path",
+                "file_size",
+                "file_type",
+                "uploaded_at",
+            }
+            legacy_not_null_cols = conn.execute(
+                text(
+                    """
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'documents'
+                      AND is_nullable = 'NO'
+                    """
+                )
+            ).fetchall()
+            for row in legacy_not_null_cols:
+                column_name = row[0]
+                if column_name not in required_columns:
+                    conn.execute(
+                        text(
+                            f'ALTER TABLE documents ALTER COLUMN "{column_name}" DROP NOT NULL'
+                        )
+                    )
+
         # Create dependent tables after documents.id type has been normalized.
         doc_id_type = _column_type(conn, "documents", "id")
         doc_fk_sql_type = "VARCHAR(36)"
