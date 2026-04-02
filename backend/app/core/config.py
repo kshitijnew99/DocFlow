@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     REDIS_PUBSUB_CHANNEL_PREFIX: str = "docflow:job:"
 
     # Keyword Extraction
-    KEYWORD_EXTRACTOR: str = "auto"  # auto | keybert | yake | frequency
+    KEYWORD_EXTRACTOR: str = "yake"  # auto | keybert | yake | frequency
     KEYWORD_TOP_N: int = 10
     KEYWORD_NGRAM_MIN: int = 1
     KEYWORD_NGRAM_MAX: int = 2
