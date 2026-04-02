@@ -14,10 +14,123 @@ def ensure_schema_compatibility(engine: Engine) -> None:
     where older databases may have been stamped in Alembic without full schema
     parity.
     """
+
+    def _column_type(conn, table_name: str, column_name: str) -> str | None:
+        row = conn.execute(
+            text(
+                """
+                SELECT data_type
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = :table_name
+                  AND column_name = :column_name
+                """
+            ),
+            {"table_name": table_name, "column_name": column_name},
+        ).first()
+        return row[0] if row else None
+
     with engine.begin() as conn:
         existing_tables = set(inspect(conn).get_table_names())
 
+        # Create missing core tables first so subsequent backfills/queries are safe.
+        if "documents" not in existing_tables:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS documents (
+                        id VARCHAR(36) PRIMARY KEY,
+                        filename VARCHAR(500) NOT NULL,
+                        original_filename VARCHAR(500) NOT NULL,
+                        file_path VARCHAR(1000) NOT NULL,
+                        file_size INTEGER NOT NULL,
+                        file_type VARCHAR(100) NOT NULL,
+                        mime_type VARCHAR(200),
+                        uploaded_at TIMESTAMP NOT NULL DEFAULT NOW()
+                    )
+                    """
+                )
+            )
+            existing_tables.add("documents")
+
+        if "processing_jobs" not in existing_tables:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS processing_jobs (
+                        id VARCHAR(36) PRIMARY KEY,
+                        document_id VARCHAR(36) NOT NULL REFERENCES documents(id),
+                        celery_task_id VARCHAR(200),
+                        status VARCHAR(20) NOT NULL DEFAULT 'queued',
+                        current_stage VARCHAR(100),
+                        progress DOUBLE PRECISION DEFAULT 0.0,
+                        error_message TEXT,
+                        retry_count INTEGER DEFAULT 0,
+                        max_retries INTEGER DEFAULT 3,
+                        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                        started_at TIMESTAMP,
+                        completed_at TIMESTAMP
+                    )
+                    """
+                )
+            )
+            existing_tables.add("processing_jobs")
+
+        if "extracted_results" not in existing_tables:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS extracted_results (
+                        id VARCHAR(36) PRIMARY KEY,
+                        job_id VARCHAR(36) NOT NULL REFERENCES processing_jobs(id),
+                        title VARCHAR(500),
+                        category VARCHAR(200),
+                        summary TEXT,
+                        keywords JSONB,
+                        raw_text TEXT,
+                        word_count INTEGER,
+                        char_count INTEGER,
+                        language VARCHAR(50),
+                        structured_data JSONB,
+                        is_finalized BOOLEAN DEFAULT FALSE,
+                        finalized_at TIMESTAMP,
+                        reviewed_data JSONB,
+                        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+                    )
+                    """
+                )
+            )
+            existing_tables.add("extracted_results")
+
+        if "job_events" not in existing_tables:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS job_events (
+                        id VARCHAR(36) PRIMARY KEY,
+                        job_id VARCHAR(36) NOT NULL REFERENCES processing_jobs(id),
+                        event_type VARCHAR(100) NOT NULL,
+                        stage VARCHAR(100),
+                        progress DOUBLE PRECISION DEFAULT 0.0,
+                        message TEXT,
+                        metadata JSONB,
+                        occurred_at TIMESTAMP NOT NULL DEFAULT NOW()
+                    )
+                    """
+                )
+            )
+            existing_tables.add("job_events")
+
         if "documents" in existing_tables:
+            doc_id_type = _column_type(conn, "documents", "id")
+            if doc_id_type in {"integer", "bigint", "smallint"}:
+                conn.execute(
+                    text(
+                        "ALTER TABLE documents ALTER COLUMN id TYPE VARCHAR(36) USING id::text"
+                    )
+                )
+
             conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS filename VARCHAR(500)"))
             conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS original_filename VARCHAR(500)"))
             conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_path VARCHAR(1000)"))
@@ -25,10 +138,36 @@ def ensure_schema_compatibility(engine: Engine) -> None:
             conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_type VARCHAR(100)"))
             conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS mime_type VARCHAR(200)"))
             conn.execute(text("ALTER TABLE documents ADD COLUMN IF NOT EXISTS uploaded_at TIMESTAMP"))
+            conn.execute(text("UPDATE documents SET filename = 'legacy-document' WHERE filename IS NULL"))
+            conn.execute(
+                text(
+                    "UPDATE documents SET original_filename = COALESCE(original_filename, filename, 'legacy-document') "
+                    "WHERE original_filename IS NULL"
+                )
+            )
+            conn.execute(text("UPDATE documents SET file_path = '' WHERE file_path IS NULL"))
+            conn.execute(text("UPDATE documents SET file_size = 0 WHERE file_size IS NULL"))
+            conn.execute(text("UPDATE documents SET file_type = '' WHERE file_type IS NULL"))
             conn.execute(text("UPDATE documents SET uploaded_at = NOW() WHERE uploaded_at IS NULL"))
             conn.execute(text("ALTER TABLE documents ALTER COLUMN uploaded_at SET DEFAULT NOW()"))
 
         if "processing_jobs" in existing_tables:
+            jobs_id_type = _column_type(conn, "processing_jobs", "id")
+            if jobs_id_type in {"integer", "bigint", "smallint"}:
+                conn.execute(
+                    text(
+                        "ALTER TABLE processing_jobs ALTER COLUMN id TYPE VARCHAR(36) USING id::text"
+                    )
+                )
+
+            jobs_doc_id_type = _column_type(conn, "processing_jobs", "document_id")
+            if jobs_doc_id_type in {"integer", "bigint", "smallint"}:
+                conn.execute(
+                    text(
+                        "ALTER TABLE processing_jobs ALTER COLUMN document_id TYPE VARCHAR(36) USING document_id::text"
+                    )
+                )
+
             conn.execute(text("ALTER TABLE processing_jobs ADD COLUMN IF NOT EXISTS celery_task_id VARCHAR(200)"))
             conn.execute(text("ALTER TABLE processing_jobs ADD COLUMN IF NOT EXISTS status VARCHAR(20)"))
             conn.execute(text("ALTER TABLE processing_jobs ADD COLUMN IF NOT EXISTS current_stage VARCHAR(100)"))
