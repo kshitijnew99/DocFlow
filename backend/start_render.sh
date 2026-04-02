@@ -1,16 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# If tables already exist but Alembic metadata is missing, stamp once and continue.
+# If tables already exist but Alembic metadata is missing/incomplete, stamp once and continue.
 needs_stamp=$(python - <<'PY'
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
 from app.core.config import get_settings
 
 settings = get_settings()
 engine = create_engine(settings.DATABASE_URL)
 tables = set(inspect(engine).get_table_names())
 
-print("yes" if "documents" in tables and "alembic_version" not in tables else "no")
+if "documents" not in tables:
+	print("no")
+elif "alembic_version" not in tables:
+	print("yes")
+else:
+	with engine.connect() as conn:
+		version_rows = conn.execute(text("SELECT COUNT(*) FROM alembic_version")).scalar_one()
+	print("yes" if version_rows == 0 else "no")
 PY
 )
 
