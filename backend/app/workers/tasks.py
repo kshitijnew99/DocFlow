@@ -236,7 +236,7 @@ def _parse_file(file_path: str, file_type: str, original_filename: str) -> dict:
             with open(file_path, "r", encoding="utf-8", errors="replace") as f:
                 text = f.read()
         except Exception:
-            text = f"[Text file unreadable: {original_filename}]"
+            text = f"[Binary or unreadable text file: {original_filename}]"
     else:
         text = f"[Binary file '{original_filename}' ({ext or 'unknown'}) - text preview unavailable]"
 

@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from app.core.database import engine, Base
 from app.core.config import get_settings
+from app.core.schema_compat import ensure_schema_compatibility
 from app.api.routes import router
 import app.models.models  # ensure models are registered
 
@@ -19,6 +20,10 @@ async def lifespan(app: FastAPI):
     # In production use Alembic migrations instead of create_all.
     if settings.ENVIRONMENT.lower() == "development" and settings.AUTO_CREATE_TABLES:
         Base.metadata.create_all(bind=engine)
+
+    if settings.AUTO_REPAIR_SCHEMA:
+        ensure_schema_compatibility(engine)
+
     yield
 
 

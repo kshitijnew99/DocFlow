@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.config import get_settings
 from app.core.redis_client import get_redis, get_pubsub_channel, get_job_status
+from app.models.models import JobStatus
 from app.schemas.schemas import (
     UploadResponse, PaginatedDocuments, DocumentListItem, JobDetailResponse,
     UpdateResultRequest, FinalizeRequest, ExportRequest, ExtractedResultResponse,
@@ -45,10 +46,20 @@ async def upload_documents(
         docs_out.append(doc)
         jobs_out.append(job)
 
+    queued_count = sum(1 for job in jobs_out if job.status == JobStatus.QUEUED)
+    failed_count = len(jobs_out) - queued_count
+    if failed_count:
+        message = (
+            f"{len(docs_out)} document(s) uploaded. "
+            f"{queued_count} queued, {failed_count} failed to enqueue."
+        )
+    else:
+        message = f"{len(docs_out)} document(s) uploaded and queued for processing."
+
     return UploadResponse(
         documents=[DocumentResponse.model_validate(d) for d in docs_out],
         jobs=[JobSummary.model_validate(j) for j in jobs_out],
-        message=f"{len(docs_out)} document(s) uploaded and queued for processing.",
+        message=message,
     )
 
 

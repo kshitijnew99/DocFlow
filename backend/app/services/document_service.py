@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from fastapi import UploadFile, HTTPException, status
 
 from app.core.config import get_settings
-from app.models.models import Document, ProcessingJob, ExtractedResult, JobStatus
+from app.models.models import Document, ProcessingJob, ExtractedResult, JobEvent, JobStatus
 from app.schemas.schemas import UpdateResultRequest
 
 settings = get_settings()
@@ -77,13 +77,33 @@ def create_document_and_job(db: Session, file: UploadFile) -> tuple[Document, Pr
     db.refresh(doc)
     db.refresh(job)
 
-    # Dispatch to Celery — fire and forget
-    task = process_document.apply_async(
-        args=[str(job.id), str(doc.id), file_path, doc.original_filename, ext],
-        task_id=str(uuid.uuid4()),
-    )
-    job.celery_task_id = task.id
-    db.commit()
+    # Dispatch to Celery — fire and forget.
+    # If queueing fails, preserve the upload and mark job as failed instead of
+    # surfacing an opaque 500.
+    try:
+        task = process_document.apply_async(
+            args=[str(job.id), str(doc.id), file_path, doc.original_filename, ext],
+            task_id=str(uuid.uuid4()),
+        )
+        job.celery_task_id = task.id
+        db.commit()
+    except Exception as exc:
+        job.status = JobStatus.FAILED
+        job.current_stage = "job_failed"
+        job.error_message = f"Failed to enqueue processing task: {exc}"
+        job.completed_at = datetime.utcnow()
+        db.add(
+            JobEvent(
+                job_id=str(job.id),
+                event_type="job_failed",
+                stage="job_failed",
+                progress=0.0,
+                message="Failed to enqueue processing task",
+                event_metadata={"error": str(exc)},
+            )
+        )
+        db.commit()
+        db.refresh(job)
 
     return doc, job
 
@@ -167,14 +187,25 @@ def retry_job(db: Session, job_id: str) -> ProcessingJob:
     job.completed_at = None
     db.commit()
 
-    task = process_document.apply_async(
-        args=[str(job.id), str(doc.id), doc.file_path,
-              doc.original_filename, doc.file_type],
-        task_id=str(uuid.uuid4()),
-    )
-    job.celery_task_id = task.id
-    db.commit()
-    db.refresh(job)
+    try:
+        task = process_document.apply_async(
+            args=[str(job.id), str(doc.id), doc.file_path,
+                  doc.original_filename, doc.file_type],
+            task_id=str(uuid.uuid4()),
+        )
+        job.celery_task_id = task.id
+        db.commit()
+        db.refresh(job)
+    except Exception as exc:
+        job.status = JobStatus.FAILED
+        job.current_stage = "job_failed"
+        job.error_message = f"Failed to enqueue retry task: {exc}"
+        job.completed_at = datetime.utcnow()
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Background queue unavailable. Please try again shortly.",
+        ) from exc
 
     publish_event(str(job.id), {
         "job_id": str(job.id),
