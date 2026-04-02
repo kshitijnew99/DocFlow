@@ -42,7 +42,7 @@ export default function Dashboard() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [exporting, setExporting] = useState(false);
 
-  const searchTimeout = useRef<NodeJS.Timeout>();
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,7 +78,9 @@ export default function Dashboard() {
   }, [docs, load]);
 
   const handleSearch = (val: string) => {
-    clearTimeout(searchTimeout.current);
+    if (searchTimeout.current) {
+      clearTimeout(searchTimeout.current);
+    }
     searchTimeout.current = setTimeout(() => {
       setSearch(val);
       setPage(1);
