@@ -1,0 +1,38 @@
+{
+  "organization": "TechCorp Inc.",
+  "report_type": "Annual Security Audit",
+  "fiscal_year": 2024,
+  "prepared_by": "Security Operations Center",
+  "executive_summary": "This report details findings from our comprehensive security audit conducted across all business units. A total of 47 systems were evaluated, with 3 critical, 8 high, 14 medium, and 22 low severity findings identified.",
+  "findings": [
+    {
+      "id": "CRIT-001",
+      "severity": "critical",
+      "title": "Unpatched Authentication Bypass Vulnerability",
+      "affected_systems": ["api-gateway-prod", "auth-service-v1"],
+      "description": "CVE-2024-1234 allows remote unauthenticated access to administrative endpoints.",
+      "remediation": "Apply vendor patch immediately and rotate all API keys.",
+      "status": "remediated"
+    },
+    {
+      "id": "HIGH-001",
+      "severity": "high",
+      "title": "Excessive Privilege Escalation Paths",
+      "affected_systems": ["identity-provider", "ldap-cluster"],
+      "description": "Multiple non-privileged accounts have pathways to escalate to domain administrator.",
+      "remediation": "Implement principle of least privilege and audit group memberships quarterly.",
+      "status": "in_progress"
+    }
+  ],
+  "compliance": {
+    "SOC2_Type2": "compliant",
+    "ISO_27001": "in_progress",
+    "GDPR": "compliant",
+    "HIPAA": "not_applicable"
+  },
+  "recommendations": [
+    "Implement zero-trust network architecture within 18 months",
+    "Establish a bug bounty program to leverage external security researchers",
+    "Increase security awareness training frequency from annual to quarterly"
+  ]
+}

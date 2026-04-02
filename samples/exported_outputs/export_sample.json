@@ -1,0 +1,34 @@
+[
+  {
+    "job_id": "3f7a1e2c-8b4d-4c91-a123-1e2f3d4a5b6c",
+    "document": "ai_healthcare_report.txt",
+    "status": "finalized",
+    "finalized": true,
+    "title": "The Future of Artificial Intelligence in Healthcare",
+    "category": "Research / Academic",
+    "summary": "This document explores the transformative impact of artificial intelligence on modern healthcare systems. Machine learning algorithms are increasingly being used to diagnose diseases, predict patient outcomes, and optimize treatment plans...",
+    "keywords": ["artificial", "intelligence", "healthcare", "machine", "learning", "clinical", "patient", "medical", "deep", "imaging"],
+    "word_count": 312,
+    "language": "en",
+    "finalized_at": "2024-06-15T14:32:07.123456",
+    "document_id": "9a1b2c3d-4e5f-6789-abcd-ef0123456789",
+    "processed_at": "2024-06-15T14:31:55.000000",
+    "char_count": 1987
+  },
+  {
+    "job_id": "7d2e5f1a-9c3b-4e87-b456-2f3e4d5a6b7c",
+    "document": "quarterly_sales.csv",
+    "status": "finalized",
+    "finalized": true,
+    "title": "product_id,product_name,category,units_sold,revenue_usd,region,quarter",
+    "category": "Data / Spreadsheet",
+    "summary": "product_id,product_name,category,units_sold,revenue_usd,region,quarter P001,Widget Pro,Electronics,1250,62500.00,North America,Q1 2024 P002,Gadget Plus,Electronics,890...",
+    "keywords": ["widget", "software", "north", "america", "europe", "electronics", "gadget", "cloudk", "datasnc", "superwidget"],
+    "word_count": 89,
+    "language": "en",
+    "finalized_at": "2024-06-15T14:35:22.654321",
+    "document_id": "b1c2d3e4-f5a6-7890-bcde-f01234567890",
+    "processed_at": "2024-06-15T14:35:10.000000",
+    "char_count": 561
+  }
+]

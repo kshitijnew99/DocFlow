@@ -1,0 +1,11 @@
+product_id,product_name,category,units_sold,revenue_usd,region,quarter
+P001,Widget Pro,Electronics,1250,62500.00,North America,Q1 2024
+P002,Gadget Plus,Electronics,890,44500.00,Europe,Q1 2024
+P003,SuperWidget,Software,3200,160000.00,North America,Q1 2024
+P004,DataSync,Software,2100,105000.00,Asia Pacific,Q1 2024
+P005,CloudKit,Software,1800,90000.00,Europe,Q1 2024
+P006,Widget Pro,Electronics,1400,70000.00,North America,Q2 2024
+P007,Gadget Plus,Electronics,1050,52500.00,Europe,Q2 2024
+P008,SuperWidget,Software,3800,190000.00,Asia Pacific,Q2 2024
+P009,DataSync,Software,2600,130000.00,North America,Q2 2024
+P010,CloudKit,Software,2200,110000.00,Europe,Q2 2024

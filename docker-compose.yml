@@ -1,0 +1,95 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: docflow_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-docflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-docflow_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-docflow_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-docflow} -d ${POSTGRES_DB:-docflow_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: docflow_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: docflow_backend
+    environment:
+      DATABASE_URL: ${DOCKER_DATABASE_URL:-postgresql://docflow:docflow_secret@postgres:5432/docflow_db}
+      REDIS_URL: ${DOCKER_REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${DOCKER_CELERY_BROKER_URL:-redis://redis:6379/1}
+      CELERY_RESULT_BACKEND: ${DOCKER_CELERY_RESULT_BACKEND:-redis://redis:6379/2}
+      UPLOAD_DIR: /app/uploads
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - uploads_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: docflow_worker
+    environment:
+      DATABASE_URL: ${DOCKER_DATABASE_URL:-postgresql://docflow:docflow_secret@postgres:5432/docflow_db}
+      REDIS_URL: ${DOCKER_REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${DOCKER_CELERY_BROKER_URL:-redis://redis:6379/1}
+      CELERY_RESULT_BACKEND: ${DOCKER_CELERY_RESULT_BACKEND:-redis://redis:6379/2}
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - ./backend:/app
+      - uploads_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=4
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: docflow_frontend
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  uploads_data:

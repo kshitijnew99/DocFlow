@@ -1,0 +1,99 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --surface: #0e0f14;
+  --surface-1: #13151c;
+  --surface-2: #1a1d27;
+  --surface-3: #222634;
+  --accent: #6c63ff;
+  --accent-dim: #4f47cc;
+  --accent-glow: rgba(108,99,255,0.25);
+  --success: #22d3a0;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --muted: #6b7280;
+  --border: #2a2e3f;
+  --text: #e2e4ef;
+  --text-dim: #9ca3af;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  background: var(--surface);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+  scroll-behavior: smooth;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--surface-1); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent-dim); }
+
+/* Selection */
+::selection { background: var(--accent-glow); }
+
+/* Grid background */
+.grid-bg {
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: center center;
+}
+
+/* Glow card */
+.glow-card {
+  position: relative;
+  overflow: hidden;
+}
+.glow-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, var(--accent-glow), transparent 60%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Progress bar shimmer */
+.progress-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0%,
+    #a78bfa 40%,
+    var(--accent) 80%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s infinite;
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+/* Fade slide in */
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-in { animation: slideIn 0.3s ease-out forwards; }
+
+/* Pulse ring for active jobs */
+@keyframes ringPulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  50%       { box-shadow: 0 0 0 6px transparent; }
+}
+.ring-pulse { animation: ringPulse 2s infinite; }
