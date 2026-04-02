@@ -16,8 +16,9 @@ def _parse_cors_origins(origins: str) -> list[str]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create tables on startup
-    Base.metadata.create_all(bind=engine)
+    # In production use Alembic migrations instead of create_all.
+    if settings.ENVIRONMENT.lower() == "development" and settings.AUTO_CREATE_TABLES:
+        Base.metadata.create_all(bind=engine)
     yield
 
 

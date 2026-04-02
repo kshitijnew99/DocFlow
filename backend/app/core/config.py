@@ -15,6 +15,8 @@ class Settings(BaseSettings):
 
     # App
     SECRET_KEY: str = "dev-secret-key"
+    ENVIRONMENT: str = "development"
+    AUTO_CREATE_TABLES: bool = True
     UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_SIZE_MB: int = 50
     ALLOWED_EXTENSIONS: list[str] = [".txt", ".pdf", ".csv", ".json", ".md", ".xml"]
