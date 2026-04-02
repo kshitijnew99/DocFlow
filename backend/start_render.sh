@@ -27,7 +27,28 @@ if [[ "$needs_stamp" == "yes" ]]; then
 fi
 
 # Apply DB migrations before starting the API process.
-alembic upgrade head
+# If initial migration re-runs against an existing schema, stamp and continue.
+if ! alembic upgrade head; then
+	echo "Alembic upgrade failed. Checking for existing base schema..."
+	has_documents=$(python - <<'PY'
+from sqlalchemy import create_engine, inspect
+from app.core.config import get_settings
+
+settings = get_settings()
+engine = create_engine(settings.DATABASE_URL)
+tables = set(inspect(engine).get_table_names())
+print("yes" if "documents" in tables else "no")
+PY
+)
+
+	if [[ "$has_documents" == "yes" ]]; then
+		echo "Existing documents table found. Stamping migration head and continuing startup..."
+		alembic stamp head
+	else
+		echo "Migration failed and base schema was not detected. Aborting startup."
+		exit 1
+	fi
+fi
 
 # Start Celery worker in the background so uploaded files can be processed.
 celery -A app.workers.celery_app worker --loglevel=info --concurrency="${CELERY_CONCURRENCY:-2}" &
