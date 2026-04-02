@@ -56,7 +56,11 @@ export default function DropZone({ onUpload, isUploading }: Props) {
       setSuccess(true);
       setTimeout(() => setSuccess(false), 4000);
     } catch (e: any) {
-      setError(e?.response?.data?.detail || "Upload failed. Please try again.");
+      setError(
+        e?.response?.data?.detail ||
+          e?.message ||
+          "Upload failed. Please try again."
+      );
     }
   };
 

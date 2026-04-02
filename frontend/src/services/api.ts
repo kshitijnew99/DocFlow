@@ -16,15 +16,61 @@ const api = axios.create({
   timeout: 30_000,
 });
 
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function waitForBackendReady(maxWaitMs = 90_000): Promise<void> {
+  const started = Date.now();
+  let lastError: unknown = null;
+
+  while (Date.now() - started < maxWaitMs) {
+    try {
+      await api.get("/health", { timeout: 8_000 });
+      return;
+    } catch (err) {
+      lastError = err;
+      await delay(2_000);
+    }
+  }
+
+  if (axios.isAxiosError(lastError) && lastError.message) {
+    throw new Error(`Backend is waking up. ${lastError.message}`);
+  }
+  throw new Error("Backend is waking up. Please try again in a few seconds.");
+}
+
+function isTransientUploadError(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) return false;
+  if (error.code === "ECONNABORTED") return true;
+  if (!error.response) return true;
+  return [429, 502, 503, 504].includes(error.response.status);
+}
+
 // ── Upload ────────────────────────────────────────────────────────────────────
 
 export async function uploadDocuments(files: File[]): Promise<UploadResponse> {
+  await waitForBackendReady();
+
   const form = new FormData();
   files.forEach((f) => form.append("files", f));
-  const { data } = await api.post<UploadResponse>("/upload", form, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-  return data;
+
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const { data } = await api.post<UploadResponse>("/upload", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 120_000,
+      });
+      return data;
+    } catch (error) {
+      lastError = error;
+      if (!isTransientUploadError(error) || attempt === 1) {
+        throw error;
+      }
+      await delay(1_500);
+    }
+  }
+
+  throw lastError;
 }
 
 // ── Documents list ────────────────────────────────────────────────────────────
